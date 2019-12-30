@@ -1,2 +1,6 @@
 # python-test
-ppersonal python file
+工作所用脚本
+不是大项目
+自娱自乐
+自欺欺人
+自嗨而已
