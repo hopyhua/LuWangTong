@@ -1,0 +1,37 @@
+from docx import Document
+from docx.enum.text import WD_PARAGRAPH_ALIGNMENT
+from docx.shared import RGBColor
+from docx.shared import Inches
+import openpyxl
+wb=openpyxl.load_workbook('路网通案例.xlsx')
+sheet=wb.active
+for i in range(2,sheet.max_row+1):#取所有行数
+    id=sheet['A'+str(i)].value #取路网通案例工单ID
+    problem=sheet['AS'+str(i)].value#取问题分析部分
+    way=sheet['AT'+str(i)].value.split('。')[0]#取自有初步分析部分
+    way1=sheet['AT'+str(i)].value.split('。')[1]#取中端人员自己分析部分
+    doc=Document()
+    head=doc.add_heading()
+    head.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
+    head_run=head.add_run('中端工单号'+str(id))
+    head_run.font.color.rgb =RGBColor(0,0,0)
+    p1 = doc.add_paragraph('一、问题描述 ')
+    p2=doc.add_paragraph('【原因分析】'+problem)
+    doc.add_picture((str(id)+'.png'),width=Inches(6))
+    p3=doc.add_paragraph('【优化措施】'+str(way))
+    p4=doc.add_paragraph('【质检要求】合格')
+    p5=doc.add_paragraph('二、三方处理回复')
+    p6=doc.add_paragraph('【现场确认】'+way1)
+    p7=doc.add_paragraph('【落地措施】'+way1)
+    list1=['干扰','加站','新增','故障','排除','排查']
+    for j in list1:
+        if j in  way1:
+            p8=doc.add_paragraph('【实施效果】'+'未解决')
+            break
+        else:
+            p8 = doc.add_paragraph('【实施效果】' + '已解决')
+            break
+    p9=doc.add_paragraph('三、现场测试图')
+    p10=doc.add_paragraph('（如需现场效果验证提供）')
+    doc.save(f'中端工单效果评估报告（{id}）V1.02019.docx')
+wb.close()
