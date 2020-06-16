@@ -1,0 +1,164 @@
+from PySide2.QtWidgets import *
+from PySide2.QtUiTools import QUiLoader
+from openpyxl import *
+import re
+from docx import Document
+from docx.enum.text import WD_PARAGRAPH_ALIGNMENT
+from docx.shared import RGBColor
+from docx.shared import Inches
+from docx.oxml.ns import qn
+import csv
+
+class Stats:
+    def __init__(self):
+        # 从文件中加载UI定义
+        # 从 UI 定义中动态 创建一个相应的窗口对象
+        # 注意：里面的控件对象也成为窗口对象的属性了
+        # 比如 self.ui.button , self.ui.textEdit
+        self.ui = QUiLoader().load('LuWangTong.ui')
+        self.ui.button.clicked.connect(self.handleCalc)
+        self.ui.button1.clicked.connect(self.run_chaxun)
+        self.ui.button2.clicked.connect(self.run_fenxi)
+        self.ui.button3.clicked.connect(self.run_zhongduanfenxi)
+        self.ui.button4.clicked.connect(self.run_toword)
+        self.ui.button5.clicked.connect(self.run_linqu)
+    def handleCalc(self):
+        filePath = QFileDialog.getOpenFileName(
+                    self.ui,  # 父窗口对象
+                    "选择你要打开的文件")# 选择类型过滤项，过滤内容在括号中
+        self.wb1=load_workbook(filePath[0])
+        if not filePath[0]:
+                QMessageBox.critical(
+                        self.ui,
+                        '错误',
+                        '请选择正确的文件！')
+        else:
+            self.ui.lineEdit1.setText(filePath[0])
+            self.ui.textBrowser.setText(f'文件已经导入，目录为{filePath[0]},请进行下一步----')
+
+    def run_chaxun(self):
+        anli_info = self.ui.lineEdit2.text()
+        ws = self.wb1.active
+        for i in range(2,ws.max_row+1):
+            if ws['A'+str(i)].value==anli_info:
+                self.ui.textBrowser.setText(ws['B'+str(i)].value)
+                break
+    def run_fenxi(self):
+        wb2 = Workbook()
+        ws1 = self.wb1.active
+        ws2 = wb2.active
+        ws2["A1"].value = "工单流水号"
+        ws2["B1"].value = "问题点类别"
+        ws2['C1'].value = "自有人员分析"
+        ws2["D1"].value = "自有人员建议"
+        ws2["E1"].value = "中端人员分析"
+        ws2["F1"].value = "落地措施"
+        ws2["G1"].value = "效果评估"
+        ws2["H1"].value = "占用小区"
+        ws2["I1"].value = "原因"
+        ws2["J"].value="网格"
+        rows = ws1.max_row
+        p = re.compile(r'小区:(.*?),')
+        for i in range(2, rows + 1):
+            try:
+                ws2['A' + str(i)].value = ws1['A' + str(i)].value
+                ws2['B' + str(i)].value = ws1['F' + str(i)].value
+                ws1['R' + str(i)].value = ws1['AC' + str(i)].value[0:4]
+                if ws1['R' + str(i)].value != "切换过晚":
+                    if ws1['R' + str(i)].value != "模三干扰":
+                        if ws1['R' + str(i)].value != "重叠覆盖":
+                            if ws1['R' + str(i)].value != "参数核查":
+                                if ws1['R' + str(i)].value != "邻区漏配":
+                                    ws1['R' + str(i)].value = "参数设置不合理"
+                chubu_fenxi = ws1['AD' + str(i)].value.split(';')[0].replace('【事件信息：', '测试终端')
+                ws2['C' + str(i)].value = chubu_fenxi + '由于' + ws1['R' + str(i)].value + "导致" + ws2['B' + str(i)].value + "问题"
+                ws2['D' + str(i)].value = "请结合现场实际情况进行参数调整以及复测"
+                ws2['G' + str(i)].value = "【效果评估】参数修改后，" + ws1['F' + str(i)].value + "已经解决，MR覆盖率指标正常，指标达到质检标准；现场拨测正常，联系人：18516717771。"
+                xiaoqu = p.findall(chubu_fenxi)
+                ws2['H' + str(i)].value = xiaoqu[0]
+                ws2['E' + str(i)].value = "【现场确认】" + ws2['H' + str(i)].value + "小区主要覆盖居民区，小区无告警干扰，现场确认存在切换过晚导致MR覆盖率低，需对切换参数进行调整。"
+                ws2['F' + str(i)].value = "【措施落实】" + ws2['H' + str(i)].value + "调整异频切换参数，将异频切换A1/A2门限由-101/-105调整为-99/-103"
+                ws2['I' + str(i)].value = ws1['R' + str(i)].value
+                ws2['J'+str(i)].value=ws1['G'+str(i)]
+            except BaseException:
+                self.ui.textBrowser.setText( ws1['A' + str(i)].value+"出现异常")
+                # continue
+        wb2.save('D:\\日常工作月度\\2020年6月\\新的案例.xlsx')
+        wb2.close()
+        QMessageBox.critical(
+            self.ui,
+            'OK',
+            '表格处理完成！')
+    #excel转成word
+    def run_toword(self):
+        sheet = self.wb1.active
+        for i in range(2,sheet.max_row + 1):  # 取所有行数
+            try:
+                id = sheet['A' + str(i)].value  # 取路网通案例工单ID
+                ziyou_fenxi = sheet['C' + str(i)].value  # 取自有人员分析
+                ziyou_jianyi = sheet['D' + str(i)].value  # 取自有建议
+                zhongduan_queren = sheet['E' + str(i)].value  # 取中端确认
+                xianchangluoshi = sheet['F' + str(i)].value  # 取现场确认
+                xiaoguo = sheet['G' + str(i)].value  # 实施效果评估
+                doc = Document()
+                doc.styles['Normal'].font.name = u'宋体'
+                doc.styles['Normal']._element.rPr.rFonts.set(qn('w:eastAsia'), u'宋体')
+                head = doc.add_heading()
+                head.alignment = WD_PARAGRAPH_ALIGNMENT.CENTER
+                head_run = head.add_run('中端工单号' + str(id))
+                head_run.font.color.rgb = RGBColor(0, 0, 0)
+                p1 = doc.add_paragraph('一、问题描述 ')
+                p2 = doc.add_paragraph('【原因分析】' + str(ziyou_fenxi))
+                doc.add_picture(('D:\\案例截图\\' + str(id) + '.png'), width=Inches(6))
+                p3 = doc.add_paragraph('【优化措施】' + ziyou_jianyi)
+                p4 = doc.add_paragraph('【质检要求】合格')
+                p5 = doc.add_paragraph('二、三方处理回复')
+                p6 = doc.add_paragraph(zhongduan_queren)
+                p7 = doc.add_paragraph(xianchangluoshi)
+                p8 = doc.add_paragraph(xiaoguo)
+                p9 = doc.add_paragraph('三、现场测试图')
+                doc.add_picture(('D:\\案例截图\\' + str(id) + '-1' + '.png'), width=Inches(6))
+                doc.save(f'中端工单效果评估报告（{id}）V1.2020.docx')
+            except OSError:
+                continue
+        QMessageBox.critical(
+            self.ui,
+            'OK',
+            '转换成word完成！')
+    def run_zhongduanfenxi(self):
+        pass
+    def run_linqu(self):
+        import csv
+        ws = self.wb1.active
+        rows = ws.max_row
+        p = re.compile(r'CGI:(.*?)\)', re.M)
+        scgis = []
+        ncgis = []
+        for i in range(2, rows + 1):
+            ws['AC' + str(i)].value = ws['AC' + str(i)].value[:4]
+            if ws['AC' + str(i)].value == '邻区漏配':
+                CGIS = p.findall(ws['AD' + str(i)].value)
+                for idx, item in enumerate(CGIS):
+                    if idx % 2 == 0:
+                        ncgis.append(item)
+                    elif idx % 2 == 1:
+                        scgis.append(item)
+                    else:
+                        pass
+        linqu = []
+        for i in range(len(ncgis)):
+            lq = [scgis[i], ncgis[i]]
+            linqu.append(lq)
+        with open('邻区.csv','w', encoding='utf-8', newline='') as f:
+            writer = csv.writer(f)
+            for a in linqu:
+                writer.writerow(a)
+            f.close()
+    # def textwiget(self):
+    #     self.ui.
+
+if __name__ == '__main__':
+    app = QApplication([])
+    stats = Stats()
+    stats.ui.show()
+    app.exec_()
